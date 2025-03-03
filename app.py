@@ -1,16 +1,12 @@
 import streamlit as st
 from PyPDF2 import PdfReader
 import nltk
-nltk.download('punkt_tab')
+nltk.download('punkt')  # Use 'punkt' for sentence tokenization
 from sentence_transformers import SentenceTransformer, util
 from transformers import pipeline
 import torch
 
-
-
-
-
-st.title("Improved PDF Chatbot")
+st.title("Improved PDF Chatbot with Detailed Answers")
 
 # Function to chunk text using sentence segmentation with overlap
 def chunk_text(text, chunk_size=5, overlap=2):
@@ -56,14 +52,14 @@ if pdf_file:
             embedding_model = SentenceTransformer('all-mpnet-base-v2')
             chunk_embeddings = embedding_model.encode(chunks, convert_to_tensor=True)
             
-            # Load a robust QA model from Hugging Face
-            st.info("Loading QA model...")
-            qa_pipeline = pipeline("question-answering", model="deepset/roberta-large-squad2")
+            # Load a generative model for more detailed answers
+            st.info("Loading generative model for detailed answers...")
+            gen_pipeline = pipeline("text2text-generation", model="google/flan-t5-large")
             
             # Input for user question
             question = st.text_input("Ask a question about the PDF:")
             
-            if st.button("Get Answer") and question:
+            if st.button("Get Detailed Answer") and question:
                 # Embed the user question
                 question_embedding = embedding_model.encode(question, convert_to_tensor=True)
                 
@@ -78,11 +74,18 @@ if pdf_file:
                 # Combine the top retrieved chunks into one context string
                 combined_context = " ".join([chunks[i] for i in top_indices])
                 
-                # Get the answer from the QA model using the combined context
-                result = qa_pipeline(question=question, context=combined_context)
+                # Construct the prompt for the generative model
+                prompt = (
+                    f"Answer the following question in detail based on the context below:\n\n"
+                    f"Context: {combined_context}\n\n"
+                    f"Question: {question}\n\n"
+                    f"Detailed Answer:"
+                )
                 
-                st.write("### Answer:")
-                st.write(result['answer'])
+                detailed_result = gen_pipeline(prompt, max_length=300)
+                
+                st.write("### Detailed Answer:")
+                st.write(detailed_result[0]['generated_text'])
                 
                 # Optional: show the combined context for debugging
                 if st.checkbox("Show combined context"):
